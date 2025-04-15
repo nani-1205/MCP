@@ -74,8 +74,8 @@ connected_agents = {} # Store mapping: user_id -> agent_sid
 
 @socketio.on('connect')
 def handle_connect():
+    # This handles connections from BOTH browser and agent initially
     logging.info(f'Client connected: SID={request.sid}, IP={request.remote_addr}')
-    # Agent needs to authenticate immediately after connecting
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -102,7 +102,7 @@ def handle_disconnect():
 def handle_authenticate_agent(data):
     token_from_agent = data.get('token')
     user_id_from_agent = data.get('user_id')
-    sid = request.sid
+    sid = request.sid # This SID belongs to the agent connection
     logging.info(f"Agent auth attempt from SID {sid} for user '{user_id_from_agent}' with token '{token_from_agent[:5]}...'") # Log only prefix
     # logging.debug(f"Currently known valid tokens: {valid_agent_tokens}") # Avoid logging full tokens often
 
@@ -112,14 +112,15 @@ def handle_authenticate_agent(data):
     # Use secrets.compare_digest for timing-attack resistance
     if stored_token and isinstance(token_from_agent, str) and secrets.compare_digest(token_from_agent, stored_token):
         logging.info(f"Agent for user '{user_id_from_agent}' authenticated successfully. SID: {sid}")
-        connected_agents[user_id_from_agent] = sid
-        join_room(user_id_from_agent) # Put agent in a room specific to the user
+        connected_agents[user_id_from_agent] = sid # Map user_id to the AGENT'S SID
+        join_room(user_id_from_agent, sid=sid) # Put agent in its user-specific room
 
         # Notify agent of success
         emit('authentication_result', {'status': 'success'}, room=sid)
 
-        # Notify browser associated with this user_id (if any are connected via the main page)
-        emit('agent_status', {'status': 'connected', 'message': f'Agent for {user_id_from_agent} connected & ready.'}, room=user_id_from_agent)
+        # Notify browser(s) associated with this user_id (if any are connected via the main page)
+        # Browsers should also join the user_id room
+        emit('agent_status', {'status': 'connected', 'message': f'Agent for {user_id_from_agent} connected & ready.'}, room=user_id_from_agent) # Send to user room
 
     else:
         logging.warning(f"Agent authentication failed for user '{user_id_from_agent}'. Token mismatch or user_id not found. SID: {sid}")
@@ -127,40 +128,45 @@ def handle_authenticate_agent(data):
         # Consider disconnecting agent after failed attempt:
         # socketio.disconnect(sid)
 
-# --- Project Creation Logic ---
+
+# --- Project Creation Logic (CORRECTED) ---
 @socketio.on('create_project_request')
 def handle_create_project(data):
-    # Find the user_id associated with the requesting agent's SID
-    authenticated_user_id = None
-    requesting_sid = request.sid
-    for uid, agent_sid in connected_agents.items():
-        if agent_sid == requesting_sid:
-            authenticated_user_id = uid
-            break
+    # This event comes from the BROWSER (request.sid is browser's SID)
+    browser_sid = request.sid
 
-    if not authenticated_user_id:
-         emit('project_status', {'status': 'error', 'message': 'Agent is not authenticated.'}, room=requesting_sid) # Notify requesting agent SID
-         logging.warning(f"Project creation denied. Requesting Agent SID {requesting_sid} is not authenticated.")
-         return
+    # Get user_id FROM THE BROWSER'S SESSION
+    if 'user_id' not in session:
+        # This should ideally not happen if the '/' route requires login, but check anyway
+        emit('project_status', {'status': 'error', 'message': 'User session not found. Please refresh or re-authenticate.'}, room=browser_sid)
+        logging.warning(f"create_project_request received from Browser SID {browser_sid} but no user_id in session.")
+        return
 
-    # Proceed with the authenticated user_id
-    user_id = authenticated_user_id
+    user_id_from_session = session['user_id']
+    logging.info(f"Project creation request received from browser session for user '{user_id_from_session}' (Browser SID: {browser_sid})")
+
+    # Check if THIS user has an authenticated agent connected in our mapping
+    if user_id_from_session not in connected_agents:
+        emit('project_status', {'status': 'error', 'message': 'Your local agent is not connected or not authenticated.'}, room=browser_sid) # Notify specific browser
+        logging.warning(f"No authenticated agent found for user '{user_id_from_session}' when project creation requested.")
+        return
+
+    # User has a session AND an authenticated agent. Get the AGENT'S SID from the mapping.
+    agent_sid = connected_agents[user_id_from_session]
+
+    # Proceed with the validated user_id and agent_sid
     project_name = data.get('projectName')
     project_type = data.get('projectType')
     base_path = data.get('basePath') # Agent must validate this path strictly
 
     # Basic Input Validation (Example)
     if not all([project_name, project_type, base_path]):
-        logging.error(f"Missing parameters in create_project_request from user {user_id}.")
-        emit('project_status', {'status': 'error', 'message': 'Missing project parameters.'}, room=user_id) # Notify browser
-        # Optionally notify agent too: emit('command_error', {'message': '...'}, room=requesting_sid)
+        logging.error(f"Missing parameters in create_project_request from user {user_id_from_session}.")
+        # Notify the specific browser that made the request
+        emit('project_status', {'status': 'error', 'message': 'Missing project parameters.'}, room=browser_sid)
         return
 
-    logging.info(f"Received project creation request via agent for user '{user_id}' for '{project_name}' ({project_type}) at '{base_path}'")
-
-    agent_sid = connected_agents[user_id] # We know this exists from the check above
-
-    logging.info(f"Sending 'create_project' command to agent SID: {agent_sid}")
+    logging.info(f"Request validated for user '{user_id_from_session}'. Sending command to Agent SID: {agent_sid}")
 
     command_data = {
         'command': 'create_project',
@@ -171,35 +177,62 @@ def handle_create_project(data):
             'base_path': base_path
         }
     }
-    # Emit directly to the specific agent's SID
+    # Emit command ONLY to the specific AGENT'S SID
     socketio.emit('execute_command', command_data, room=agent_sid)
-    logging.info(f"Command sent to agent for user {user_id}.")
-    # Notify browser(s) associated with this user
-    emit('project_status', {'status': 'pending', 'message': f'Command sent to agent for project {project_name}.'}, room=user_id)
+    logging.info(f"Command sent to agent {agent_sid} for user {user_id_from_session}.")
+
+    # Notify the specific browser that made the request
+    emit('project_status', {'status': 'pending', 'message': f'Command sent to your local agent for project {project_name}.'}, room=browser_sid)
 
 
 # --- Agent Response Handling ---
 @socketio.on('agent_response')
 def handle_agent_response(data):
+    # This event comes from the AGENT (request.sid is agent's SID)
+    agent_sid = request.sid
     # Find user_id based on the agent's SID sending the response
     responding_user_id = None
-    responding_sid = request.sid
-    for uid, sid in connected_agents.items():
-        if sid == responding_sid:
+    for uid, connected_agent_sid in connected_agents.items():
+        if connected_agent_sid == agent_sid:
             responding_user_id = uid
             break
 
     if responding_user_id:
-        logging.info(f"Received response from agent for user '{responding_user_id}' (SID {responding_sid}): {data}")
-        # Forward response to the user's browser session(s) in the same room
-        emit('project_status', data, room=responding_user_id)
+        logging.info(f"Received response from agent for user '{responding_user_id}' (Agent SID {agent_sid}): {data}")
+        # Forward response to potentially multiple browser sessions belonging to this user
+        # Ensure browsers join the room user_id_from_session when they connect/load the page
+        emit('project_status', data, room=responding_user_id) # Send to the user's room
     else:
-        logging.warning(f"Received response from unknown/unauthenticated agent SID {responding_sid}: {data}")
+        # This shouldn't happen if agent authenticated correctly
+        logging.warning(f"Received response from unmapped/unauthenticated agent SID {agent_sid}: {data}")
 
+
+# --- Optional: Handle Browser Joining User Room ---
+# You might need logic for the browser client to explicitly join its user room
+# once the main page loads, so it receives agent_response broadcasts.
+# Example (add this handler):
+@socketio.on('join_user_room')
+def handle_join_user_room():
+    browser_sid = request.sid
+    if 'user_id' in session:
+        user_id = session['user_id']
+        join_room(user_id, sid=browser_sid)
+        logging.info(f"Browser SID {browser_sid} joined room for user '{user_id}'.")
+        # Optionally send current agent status upon joining
+        if user_id in connected_agents:
+             emit('agent_status', {'status': 'connected', 'message': f'Agent for {user_id} connected & ready.'}, room=browser_sid)
+        else:
+             emit('agent_status', {'status': 'disconnected', 'message': 'Agent not currently connected.'}, room=browser_sid)
+
+    else:
+        logging.warning(f"Browser SID {browser_sid} tried to join user room without session user_id.")
 
 if __name__ == '__main__':
+    logging.info("========================================")
     logging.info("Starting Flask server with SocketIO...")
-    # For development, debug=True is fine. Ensure it's False in production.
+    logging.info(f"Flask Secret Key Loaded: {'Yes' if app.config['SECRET_KEY'] != 'a-very-strong-dev-secret-key-change-me!' else 'No (Using Default - Insecure!)'}")
+    logging.info("Mode: Development (Debug=True)") # Change debug=False for production
+    logging.info("Ensure this is run behind a production WSGI server (like Gunicorn+eventlet) in production.")
+    logging.info("========================================")
     # Use Gunicorn + Eventlet/Gevent for production deployment instead of socketio.run
-    # Example (conceptual): gunicorn --worker-class eventlet -w 1 app:app
     socketio.run(app, debug=True, host='0.0.0.0', port=5000) # Port 5000 used in example
