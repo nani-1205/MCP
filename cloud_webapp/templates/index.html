@@ -1,36 +1,342 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>MCP Control Panel</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <!-- Include Socket.IO client library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MCP - Create New Project</title>
+  <!-- Include Socket.IO client library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+  <style>
+    :root {
+      --primary: #4a6bff;
+      --primary-hover: #3a5bed;
+      --danger: #ff4a4a;
+      --success: #28a745; /* Added success color */
+      --warning: #ffc107; /* Added warning color */
+      --text: #333;
+      --text-light: #666;
+      --bg: #f9fafc;
+      --card-bg: #ffffff;
+      --border: #e1e5ee;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 2rem;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 600px;
+      background-color: var(--card-bg);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .header {
+      background-color: var(--primary);
+      color: white;
+      padding: 1.5rem 2rem;
+      position: relative; /* For potential future elements */
+    }
+
+    .header h1 {
+      font-size: 1.8rem;
+      font-weight: 600;
+    }
+
+    .content {
+      padding: 2rem;
+    }
+
+    /* --- Status Badge Styling --- */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: 50px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+    }
+
+    .status-badge::before {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+      transition: background-color 0.3s ease;
+    }
+
+    .status-badge.disconnected {
+      background-color: rgba(255, 74, 74, 0.15);
+      color: var(--danger);
+    }
+    .status-badge.disconnected::before {
+      background-color: var(--danger);
+    }
+
+    .status-badge.connected {
+      background-color: rgba(40, 167, 69, 0.15);
+      color: var(--success);
+    }
+    .status-badge.connected::before {
+      background-color: var(--success);
+    }
+
+    .status-badge.connecting { /* Added state for checking */
+      background-color: rgba(255, 193, 7, 0.15);
+      color: var(--warning);
+    }
+    .status-badge.connecting::before {
+      background-color: var(--warning);
+    }
+     /* --- End Status Badge Styling --- */
+
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 1rem;
+      transition: all 0.2s ease;
+      background-color: #fff; /* Ensure background for select */
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(74, 107, 255, 0.15);
+    }
+
+    .form-select {
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23666' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 1rem center;
+      background-size: 1em;
+      padding-right: 2.5rem; /* Make space for arrow */
+    }
+
+    .warning {
+      font-size: 0.875rem;
+      color: var(--text-light);
+      margin-top: 0.5rem;
+      display: flex;
+      align-items: center;
+    }
+
+    .warning::before {
+      content: "⚠️"; /* Using emoji directly */
+      margin-right: 6px;
+      font-size: 1em; /* Ensure emoji size consistency */
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 0.75rem 1.5rem;
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+      width: 100%; /* Make button full width */
+    }
+
+    .btn:hover {
+      background-color: var(--primary-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(74, 107, 255, 0.2);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+      box-shadow: none;
+    }
+
+    /* --- Project Status Area --- */
+    .status-messages {
+      margin-top: 2rem;
+      padding: 1rem;
+      background-color: #f0f0f0;
+      border-radius: 6px;
+      max-height: 200px; /* Limit height */
+      overflow-y: auto;  /* Add scroll if needed */
+      border: 1px solid var(--border);
+    }
+
+    .status-messages p {
+      margin: 0 0 0.5rem 0;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px dashed var(--border);
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+    .status-messages p:last-child {
+      margin-bottom: 0;
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    /* --- End Project Status Area --- */
+
+
+    /* Navigation Bar Styling (Optional, purely visual) */
+    .navigation {
+      background-color: #eaecec; /* Lighter gray */
+      padding: 0.5rem 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-button {
+      background: none;
+      border: 1px solid #d1d5db;
+      color: #6b7280; /* Gray icon color */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    .nav-button svg {
+      fill: currentColor; /* Use button color for SVG */
+    }
+    .nav-button:hover {
+      background-color: #f3f4f6; /* Lighter hover */
+    }
+
+    .url-bar {
+      display: flex;
+      flex-grow: 1;
+      align-items: center;
+      background-color: #ffffff; /* White background */
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.4rem 0.75rem;
+      gap: 0.5rem;
+      color: var(--text-light); /* Lighter text */
+      font-size: 0.875rem;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .url-bar svg {
+      fill: #fca5a5; /* Lighter red for lock */
+      flex-shrink: 0; /* Prevent shrinking */
+    }
+    .url-bar span {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+  </style>
 </head>
 <body>
-    <h1>MCP - Create New Project</h1>
+  <div class="container">
+    <!-- Visual Navigation Bar -->
+    <div class="navigation">
+      <button class="nav-button" aria-label="Back">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3.828 7.00005H16V9.00005H3.828L9.192 14.364L7.778 15.778L0 8.00005L7.778 0.222046L9.192 1.63605L3.828 7.00005Z" fill="currentColor"/></svg>
+      </button>
+       <button class="nav-button" aria-label="Forward" style="transform: rotate(180deg);"> <!-- Forward arrow -->
+         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3.828 7.00005H16V9.00005H3.828L9.192 14.364L7.778 15.778L0 8.00005L7.778 0.222046L9.192 1.63605L3.828 7.00005Z" fill="currentColor"/></svg>
+      </button>
+      <button class="nav-button" aria-label="Reload">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.6 0 0 3.6 0 8C0 12.4 3.6 16 8 16C12.4 16 16 12.4 16 8C16 3.6 12.4 0 8 0ZM11.707 11.707C10.591 12.823 9.132 13.5 7.5 13.5C4.467 13.5 2 11.033 2 8C2 4.967 4.467 2.5 7.5 2.5C9.132 2.5 10.591 3.177 11.707 4.293L10.5 5.5H14V2L12.5 3.5C11.074 2.074 9.175 1.25 7.001 1.25C3.833 1.25 1.25 3.832 1.25 7C1.25 10.168 3.833 12.75 7.001 12.75C9.175 12.75 11.074 11.926 12.5 10.5L11.707 11.707Z" fill="currentColor"/></svg> <!-- Reload Icon -->
+      </button>
+      <div class="url-bar">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 1a3 3 0 0 1 3 3v4.5a3 3 0 1 1-6 0V4a3 3 0 0 1 3-3zm0 1.5a1.5 1.5 0 0 0-1.5 1.5V8.5a1.5 1.5 0 1 0 3 0V4A1.5 1.5 0 0 0 8 2.5zM2 7.25a.75.75 0 0 1 .75-.75h1a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-.75.75h-1a.75.75 0 0 1-.75-.75v-3zm10 0a.75.75 0 0 1 .75-.75h1a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-.75.75h-1a.75.75 0 0 1-.75-.75v-3z" fill="currentColor"/></svg> <!-- Generic Lock Icon -->
+        <span>Not secure | 18.61.85.248:5000</span> <!-- Example URL -->
+      </div>
+    </div>
+    <!-- Header Section -->
+    <div class="header">
+      <h1>MCP - Create New Project</h1>
+    </div>
+    <!-- Main Content Area -->
+    <div class="content">
+      <!-- *** ADDED id="agent-status-badge" and class="disconnected" *** -->
+      <div id="agent-status-badge" class="status-badge disconnected">
+          <!-- Text content will be updated by JS -->
+          Agent Status: Initializing...
+      </div>
 
-    <div id="agent-status">Agent Status: Disconnected</div>
-    <div id="project-status"></div>
+      <!-- Project Creation Form -->
+      <!-- *** ADDED id="project-form" *** -->
+      <form id="project-form">
+        <div class="form-group">
+          <label for="projectName">Project Name:</label>
+          <input type="text" id="projectName" class="form-control" required placeholder="e.g., my-cool-app">
+        </div>
 
-    <form id="project-form">
-        <label for="projectName">Project Name:</label>
-        <input type="text" id="projectName" name="projectName" required><br><br>
-
-        <label for="projectType">Project Type:</label>
-        <select id="projectType" name="projectType">
+        <div class="form-group">
+          <label for="projectType">Project Type:</label>
+          <select id="projectType" class="form-control form-select">
+            <!-- Values should match what agent.py expects -->
             <option value="python-basic">Python Basic</option>
             <option value="node-simple">Node.js Simple</option>
-            <!-- Add other templates/types here -->
-        </select><br><br>
+            <!-- Add other relevant options based on agent.py capabilities -->
+            <!-- <option value="react-basic">React App (via npx)</option> -->
+            <!-- <option value="java-maven">Java Maven Project</option> -->
+          </select>
+        </div>
 
-        <label for="basePath">Base Path on your PC:</label>
-        <input type="text" id="basePath" name="basePath" required placeholder="/path/to/your/dev/folder"><br>
-        <small>Warning: The agent will create files here.</small><br><br>
+        <div class="form-group">
+          <label for="basePath">Base Path on your PC:</label>
+          <input type="text" id="basePath" class="form-control" required placeholder="/path/to/your/dev/folder">
+          <div class="warning">The agent will create files/folders here. Ensure path is correct and within agent's configured allowed path.</div>
+        </div>
 
-        <button type="submit">Create Project</button>
-    </form>
+        <button type="submit" class="btn">Create Project</button>
+      </form>
 
-    <script src="/static/js/main.js"></script>
+      <!-- *** ADDED div for status messages *** -->
+      <div id="project-status-messages" class="status-messages" aria-live="polite">
+          <!-- Project status updates will appear here -->
+      </div>
+
+    </div> <!-- End content -->
+  </div> <!-- End container -->
+
+  <!-- *** ADDED script tag to include main.js *** -->
+  <script src="/static/js/main.js"></script>
+
 </body>
 </html>
