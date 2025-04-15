@@ -1,0 +1,13 @@
+# cloud_webapp/requirements.txt
+
+Flask>=2.0       # The core web framework
+Flask-SocketIO>=5.0 # For WebSocket communication
+python-dotenv>=0.15 # Optional: Good practice for loading environment variables like FLASK_SECRET_KEY from a .env file during development
+eventlet>=0.30   # Recommended asynchronous server for Flask-SocketIO for better concurrency and WebSocket handling
+gunicorn>=20.0   # Optional but recommended: Production WSGI server (often used instead of eventlet directly for deployment)
+
+# Note: When deploying to Cloud Run or similar, you might configure gunicorn
+# with eventlet workers in your Dockerfile's CMD or ENTRYPOINT.
+# Example Dockerfile CMD using gunicorn with eventlet:
+# CMD ["gunicorn", "--worker-class", "eventlet", "-w", "1", "--bind", "0.0.0.0:8080", "app:app"]
+# The port (8080) might need to match Cloud Run's expectations.
