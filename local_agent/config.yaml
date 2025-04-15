@@ -1,6 +1,6 @@
 # Configuration for the Local Agent
-cloud_url: 'http://18.61.85.248:5000' # CHANGE THIS to your deployed cloud app URL
+cloud_url: 'user_4b9f1e20c912acee' # CHANGE THIS to your deployed cloud app URL
 user_id: 'user_...' # Get this from logging into the web UI (needs implementation)
-agent_token: 'agent_token_...' # Get this from logging into the web UI (needs implementation)
+agent_token: 'agent_token_5a77efd4dd57a93e9ed4dd3bb47909f8' # Get this from logging into the web UI (needs implementation)
 base_dev_path: 'C:/Users/naniy/Documents/Development' # CHANGE THIS to your preferred base folder
 # Optional: Add paths to specific tools if not in system PATH (e.g., git_path: /usr/bin/git)
