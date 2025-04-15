@@ -1,0 +1,7 @@
+# local_agent/requirements.txt
+
+python-socketio[client]>=5.0 # Socket.IO client library (includes necessary dependencies like 'requests')
+PyYAML>=5.0                 # For parsing the config.yaml file
+
+# Note: The agent script uses built-in modules like os, subprocess, time, sys, pathlib
+# which do not need to be listed here.
