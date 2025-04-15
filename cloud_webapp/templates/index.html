@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MCP Control Panel</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <!-- Include Socket.IO client library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+</head>
+<body>
+    <h1>MCP - Create New Project</h1>
+
+    <div id="agent-status">Agent Status: Disconnected</div>
+    <div id="project-status"></div>
+
+    <form id="project-form">
+        <label for="projectName">Project Name:</label>
+        <input type="text" id="projectName" name="projectName" required><br><br>
+
+        <label for="projectType">Project Type:</label>
+        <select id="projectType" name="projectType">
+            <option value="python-basic">Python Basic</option>
+            <option value="node-simple">Node.js Simple</option>
+            <!-- Add other templates/types here -->
+        </select><br><br>
+
+        <label for="basePath">Base Path on your PC:</label>
+        <input type="text" id="basePath" name="basePath" required placeholder="/path/to/your/dev/folder"><br>
+        <small>Warning: The agent will create files here.</small><br><br>
+
+        <button type="submit">Create Project</button>
+    </form>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
